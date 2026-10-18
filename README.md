@@ -4,6 +4,8 @@ ChatGPT ile Gemini'yi Minecraft sunucusunda kılıçla karşı karşıya getiren
 
 Ayrıca bir insan oyuncu da modellerden biriyle düello yapabilir (`/yzmac kapis`).
 
+Video: <https://www.youtube.com/watch?v=5Cq4LQryRHQ>
+
 > Bu proje eğlence ve deney amaçlıdır. Sadece kendi (özel) sunucunda kullan.
 
 ## Gerekenler
