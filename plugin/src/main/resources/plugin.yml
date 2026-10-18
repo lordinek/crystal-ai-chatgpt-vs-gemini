@@ -1,0 +1,24 @@
+name: CrystalAI
+version: '${version}'
+main: com.crystalai.plugin.CrystalAIPlugin
+api-version: '1.21'
+description: Crystal PvP NPC trained with reinforcement learning
+commands:
+  crystalai:
+    description: CrystalAI NPC commands
+    usage: /crystalai <spawn|list|remove|kit|do>
+    permission: crystalai.admin
+    aliases: [cai]
+  ready:
+    description: Duel preparation done (inventory sorted), start the countdown
+    usage: /ready
+    aliases: [hazir]
+  yzmac:
+    description: ChatGPT vs Gemini sword duel series
+    usage: /yzmac <baslat|antrenman|kapis|defter|durdur|durum|izle|yenile|arena>
+    permission: crystalai.admin
+    aliases: [aimac]
+permissions:
+  crystalai.admin:
+    description: Use all CrystalAI commands
+    default: op

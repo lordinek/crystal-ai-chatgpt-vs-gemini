@@ -1,0 +1,187 @@
+{
+  "version": 2,
+  "notes": [
+    "Single source of truth for the plugin <-> trainer protocol. The plugin embeds this file and checks every observation field it writes against it, in order.",
+    "v2 (2026-09-26): full kit (sword, anchors, glowstone, pearls, xp, pickaxe, double hand), natural terrain (heightmap, boundary), one decision per tick. v1 models do not run on v2.",
+    "Frame: positions/velocities are expressed as (right, up, forward) where forward is the horizontal direction from the agent to its opponent. Movement and pearl directions use the same frame.",
+    "Scales: value_in_vector = raw / scale, then clipped to [-clip, clip] (clip defaults to 5).",
+    "Damage values are health+absorption the target would lose (see DamageCalculator)."
+  ],
+  "observation": [
+    {
+      "group": "self",
+      "fields": [
+        {"name": "health", "scale": 20, "desc": "own health"},
+        {"name": "absorption", "scale": 16, "desc": "own absorption hearts (golden apple 4, totem 8)"},
+        {"name": "totems", "scale": 8, "desc": "totems anywhere in inventory incl. hands"},
+        {"name": "offhand_totem", "scale": 1, "desc": "1 if the offhand holds a totem"},
+        {"name": "mainhand_totem", "scale": 1, "desc": "1 if the main hand holds a totem (double hand)"},
+        {"name": "gapples", "scale": 64, "desc": "golden apples"},
+        {"name": "crystals", "scale": 64, "desc": "end crystals"},
+        {"name": "obsidian", "scale": 64, "desc": "obsidian"},
+        {"name": "anchors", "scale": 64, "desc": "respawn anchors"},
+        {"name": "glowstone", "scale": 64, "desc": "glowstone blocks"},
+        {"name": "pearls", "scale": 16, "desc": "ender pearls"},
+        {"name": "xp_bottles", "scale": 64, "desc": "bottles o' enchanting"},
+        {"name": "helmet", "scale": 1, "desc": "remaining durability fraction, 0 if empty"},
+        {"name": "chestplate", "scale": 1, "desc": ""},
+        {"name": "leggings", "scale": 1, "desc": ""},
+        {"name": "boots", "scale": 1, "desc": ""},
+        {"name": "on_ground", "scale": 1, "desc": "1 if standing on a block"},
+        {"name": "vel_right", "scale": 1, "desc": "velocity, blocks/tick"},
+        {"name": "vel_up", "scale": 1, "desc": "velocity, blocks/tick"},
+        {"name": "vel_forward", "scale": 1, "desc": "velocity, blocks/tick"},
+        {"name": "eating", "scale": 1, "desc": "1 while using (eating) an item"},
+        {"name": "eat_progress", "scale": 32, "desc": "ticks spent eating so far (golden apple takes 32)"},
+        {"name": "food", "scale": 20, "desc": "food level (sprint needs > 6)"},
+        {"name": "hurt_cooldown", "scale": 20, "desc": "invulnerableTime; while > 10 only damage above last_hurt lands"},
+        {"name": "last_hurt", "scale": 40, "desc": "damage of the last hit (pre-armor), meaningful while hurt_cooldown > 10"},
+        {"name": "attack_charge", "scale": 1, "desc": "sword swing charge 0..1 (a hit needs >= actions.sword-min-charge)"},
+        {"name": "pearl_cooldown", "scale": 20, "desc": "ticks until an ender pearl can be thrown again"},
+        {"name": "mining", "scale": 1, "desc": "1 while breaking a block"},
+        {"name": "mining_progress", "scale": 1, "desc": "0..1 progress of the block being broken"},
+        {"name": "on_fire", "scale": 1, "desc": "1 while burning"},
+        {"name": "center_right", "scale": 32, "desc": "fight-site centre relative to own feet (natural terrain; 0 in flat arenas)"},
+        {"name": "center_forward", "scale": 32, "desc": ""},
+        {"name": "boundary", "scale": 1, "desc": "horizontal distance from the site centre / boundary radius (>= 1 loses)"},
+        {"name": "episode_time", "scale": 1200, "desc": "ticks since the episode started"}
+      ]
+    },
+    {
+      "group": "opponent",
+      "fields": [
+        {"name": "rel_right", "scale": 12, "desc": "opponent position relative to own feet (always ~0 by construction of the frame)"},
+        {"name": "rel_up", "scale": 12, "desc": "opponent height difference"},
+        {"name": "rel_forward", "scale": 12, "desc": "horizontal distance to the opponent"},
+        {"name": "vel_right", "scale": 1, "desc": "opponent velocity relative to own velocity"},
+        {"name": "vel_up", "scale": 1, "desc": ""},
+        {"name": "vel_forward", "scale": 1, "desc": ""},
+        {"name": "health", "scale": 20, "desc": ""},
+        {"name": "absorption", "scale": 16, "desc": ""},
+        {"name": "offhand_totem", "scale": 1, "desc": ""},
+        {"name": "mainhand_totem", "scale": 1, "desc": ""},
+        {"name": "totems", "scale": 8, "desc": ""},
+        {"name": "helmet", "scale": 1, "desc": ""},
+        {"name": "chestplate", "scale": 1, "desc": ""},
+        {"name": "leggings", "scale": 1, "desc": ""},
+        {"name": "boots", "scale": 1, "desc": ""},
+        {"name": "looking_at_me", "scale": 1, "desc": "cosine between the opponent's look direction and the direction to me"},
+        {"name": "hurt_cooldown", "scale": 20, "desc": ""},
+        {"name": "last_hurt", "scale": 40, "desc": ""},
+        {"name": "eating", "scale": 1, "desc": ""},
+        {"name": "on_ground", "scale": 1, "desc": ""},
+        {"name": "on_fire", "scale": 1, "desc": ""}
+      ]
+    },
+    {
+      "group": "candidates",
+      "repeat": 8,
+      "desc": "Candidate crystal spots, same order as the 'crystal' action (index i -> action i+1). Placeable ones first.",
+      "fields": [
+        {"name": "exists", "scale": 1, "desc": "0 for padding slots"},
+        {"name": "rel_right", "scale": 12, "desc": "crystal position relative to own feet"},
+        {"name": "rel_up", "scale": 12, "desc": ""},
+        {"name": "rel_forward", "scale": 12, "desc": ""},
+        {"name": "damage_opponent", "scale": 36, "desc": "fresh-hit damage to the opponent if it exploded"},
+        {"name": "damage_self", "scale": 36, "desc": "fresh-hit damage to me"},
+        {"name": "has_base", "scale": 1, "desc": "obsidian/bedrock already there (else obsidian is placed first)"},
+        {"name": "placeable", "scale": 1, "desc": "can be placed right now (same as the action mask)"}
+      ]
+    },
+    {
+      "group": "scene_crystals",
+      "repeat": 4,
+      "desc": "Nearest crystals already standing, same order as the 'explode' action (index i -> action i+1).",
+      "fields": [
+        {"name": "exists", "scale": 1, "desc": "0 for padding slots"},
+        {"name": "rel_right", "scale": 12, "desc": ""},
+        {"name": "rel_up", "scale": 12, "desc": ""},
+        {"name": "rel_forward", "scale": 12, "desc": ""},
+        {"name": "damage_opponent", "scale": 36, "desc": "damage if it exploded now (respects the opponent's hurt cooldown)"},
+        {"name": "damage_self", "scale": 36, "desc": "damage to me if it exploded now"}
+      ]
+    },
+    {
+      "group": "anchor_candidates",
+      "repeat": 4,
+      "desc": "Candidate anchor spots around the opponent, same order as the 'anchor' action (index i -> action i+1). Placeable ones first.",
+      "fields": [
+        {"name": "exists", "scale": 1, "desc": "0 for padding slots"},
+        {"name": "rel_right", "scale": 12, "desc": "anchor block centre relative to own feet"},
+        {"name": "rel_up", "scale": 12, "desc": ""},
+        {"name": "rel_forward", "scale": 12, "desc": ""},
+        {"name": "damage_opponent", "scale": 36, "desc": "fresh-hit damage to the opponent if detonated there"},
+        {"name": "damage_self", "scale": 36, "desc": "fresh-hit damage to me"},
+        {"name": "placeable", "scale": 1, "desc": "can be placed right now (same as the action mask)"}
+      ]
+    },
+    {
+      "group": "scene_anchors",
+      "repeat": 2,
+      "desc": "Nearest respawn anchors within 6 blocks, same order as 'anchor_use' (1+i charge, 3+i detonate).",
+      "fields": [
+        {"name": "exists", "scale": 1, "desc": "0 for padding slots"},
+        {"name": "rel_right", "scale": 12, "desc": ""},
+        {"name": "rel_up", "scale": 12, "desc": ""},
+        {"name": "rel_forward", "scale": 12, "desc": ""},
+        {"name": "charge", "scale": 4, "desc": "glowstone charges 0..4 (0 does not explode)"},
+        {"name": "damage_opponent", "scale": 36, "desc": "damage if detonated now (respects the opponent's hurt cooldown)"},
+        {"name": "damage_self", "scale": 36, "desc": "damage to me if detonated now"}
+      ]
+    },
+    {
+      "group": "heightmap",
+      "repeat": 81,
+      "desc": "Ground height around own feet on a 9x9 grid in the agent frame: forward -4..4 (rows), right -4..4 (right varies fastest). Top of the highest solid block at or below feet+4, relative to own feet; -8 if none within 8 below.",
+      "fields": [
+        {"name": "height", "scale": 4, "desc": "blocks, relative to own feet"}
+      ]
+    },
+    {
+      "group": "body",
+      "repeat": 36,
+      "desc": "Blocks around own body, 3 (right -1..1) x 3 (forward -1..1) x 4 (up -1..2); order: up, forward, right (right varies fastest).",
+      "fields": [
+        {"name": "solid", "scale": 1, "desc": "1 if the block has a collision shape"}
+      ]
+    }
+  ],
+  "action": {
+    "branches": [
+      {"name": "move", "size": 9, "desc": "0 stop, 1 toward opponent, 2 toward-right, 3 right, 4 away-right, 5 away, 6 away-left, 7 left, 8 toward-left"},
+      {"name": "jump", "size": 2, "desc": "0/1"},
+      {"name": "sprint", "size": 2, "desc": "0/1, only applied when moving toward the opponent and food > 6"},
+      {"name": "attack", "size": 2, "desc": "0 none, 1 sword hit on the opponent (reach, sight, charged swing)"},
+      {"name": "crystal", "size": 9, "desc": "0 none, i+1 = place at candidate i (obsidian first if needed)"},
+      {"name": "explode", "size": 5, "desc": "0 none, i+1 = attack scene crystal i"},
+      {"name": "anchor", "size": 5, "desc": "0 none, i+1 = place an anchor at anchor candidate i"},
+      {"name": "anchor_use", "size": 5, "desc": "0 none, 1-2 = charge scene anchor 0-1 with glowstone, 3-4 = detonate scene anchor 0-1"},
+      {"name": "block", "size": 3, "desc": "0 none, 1 = glowstone shield toward the worst threat, 2 = topblock the nearest crystal base next to me"},
+      {"name": "pearl", "size": 10, "desc": "0 none, 1-8 = throw in move direction 1-8 (config pitch), 9 = throw at the feet"},
+      {"name": "util", "size": 5, "desc": "0 none, 1 totem to offhand, 2 eat golden apple, 3 totem to main hand, 4 throw xp bottle"},
+      {"name": "mine", "size": 4, "desc": "0 none/keep going, 1 = opponent's cover block (obsidian/glowstone), 2 = block ahead at feet, 3 = block ahead at head height"}
+    ],
+    "execution_order": "totems, explode, sword, anchor use, crystal, anchor place, block, pearl, eat/xp, mining, movement"
+  },
+  "events": {
+    "desc": "Per agent, accumulated since its previous step. The trainer turns these into rewards (trainer/config.yaml).",
+    "fields": {
+      "dealt": "health+absorption the opponent lost to me",
+      "taken": "health+absorption I lost (any source)",
+      "self_damage": "part of 'taken' caused by my own crystals",
+      "totems_self": "totems I popped",
+      "totems_opponent": "totems the opponent popped",
+      "outcome": "only when done: win | loss | timeout | aborted",
+      "self_kill": "only when done: true if I died to my own crystal",
+      "length": "only when done: episode length in ticks"
+    }
+  },
+  "messages": {
+    "transport": "TCP 127.0.0.1, one JSON object per line (UTF-8, '\\n' terminated). The trainer is the client.",
+    "hello": "trainer -> plugin: {\"type\":\"hello\",\"protocol\":2}",
+    "spec": "plugin -> trainer: {\"type\":\"spec\",\"protocol\":2,\"obs_size\":N,\"branches\":[...],\"decision_interval\":1,\"agents\":[{\"id\":0,\"arena\":1,\"side\":\"A\"},...]}. Sent only once every arena is ready (natural terrain generates its sites first).",
+    "step": "plugin -> trainer: {\"type\":\"step\",\"tick\":T,\"agents\":[{\"id\":0,\"obs\":[...],\"mask\":[...0/1, branches concatenated],\"done\":false,\"terminal_obs\":null|[...],\"events\":{...}}]}",
+    "act": "trainer -> plugin: {\"type\":\"act\",\"actions\":[[one int per branch], ...]} in the order of the step's agents",
+    "error": "plugin -> trainer: {\"type\":\"error\",\"message\":\"...\"} then the connection is closed"
+  }
+}

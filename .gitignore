@@ -1,0 +1,14 @@
+# Gradle / IDE
+.gradle/
+build/
+.idea/
+*.iml
+out/
+
+# Never commit server data or secrets
+server/
+llm.yml.bak*
+**/plugins/CrystalAI/
+*.jsonl
+*.log
+.env

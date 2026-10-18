@@ -1,0 +1,123 @@
+# ChatGPT vs Gemini kılıç PvP (/yzmac). Bu dosya: plugins/CrystalAI/llm.yml
+# Değiştirince: /yzmac yenile (seri sürerken değil).
+
+# mock = ücretsiz test, rastgele sahte cevap. gercek = API'ler. (/yzmac baslat mock|gercek ile ezilir)
+mod: mock
+
+# --- Taraflar. Anahtarları paylaşma, bu dosyayı git'e koyma.
+# Adillik: iki model de aynı seviyede (ucuz/hızlı katman) olmalı.
+chatgpt:
+  isim: ChatGPT                 # NPC adı (max 16 karakter)
+  api-anahtari: "BURAYA_OPENAI_ANAHTARI"
+  model: gpt-4.1-mini
+  # -1 = gönderme (model varsayılanı). Bazı yeni modeller temperature kabul etmiyor.
+  temperature: -1
+  # Maliyet tahmini için, $ / 1M token (model fiyat sayfasından güncelle)
+  fiyat-girdi-1m: 0.40
+  fiyat-cikti-1m: 1.60
+gemini:
+  isim: Gemini
+  api-anahtari: "BURAYA_GEMINI_ANAHTARI"
+  model: gemini-2.5-flash
+  temperature: -1
+  # Düşünme tokenleri max-tokens'tan yer: 0 = düşünme kapalı (cevap kesilmesin). -1 = gönderme.
+  thinking-budget: 0
+  fiyat-girdi-1m: 0.30
+  fiyat-cikti-1m: 2.50
+
+# İki tarafa birebir aynı.
+sistem-promptu: |
+  Sen Minecraft'ta bir kılıç dövüşündesin. Rakibini yenmek zorundasın.
+  Her seferinde sana durum bilgisi verilecek (can 20 üzerinden, mesafe blok, kalan_sure saniye).
+  Kılıç menzili yaklaşık 3 blok. Hamleler:
+  saldir: yaklaş ve vur. kac: uzaklaş. blokla: kalkanı kaldır, hasar almazsın ama vuramazsın.
+  yaklas: vurmadan mesafe kapat. yan_adim: sağa sola kaçarak yaklaş. iyiles: altın elma ye (sınırlı).
+  kritik: zıplayıp kritik vuruş dene (daha güçlü, daha yavaş).
+  Sadece şu formatta cevap ver:
+  {"hamle": "<saldir|kac|blokla|yaklas|yan_adim|iyiles|kritik>", "dusunce": "<en fazla 10 kelime>"}
+  Başka hiçbir şey yazma. Kısa ve hızlı karar ver.
+  Canın azsa güvenli oyna, rakibin canı azsa baskı kur.
+
+# 50 tick = 2.5 sn. İki tarafa aynı tick'te sorulur.
+karar-araligi-tick: 50
+zaman-asimi-ms: 2500
+# Zaman aşımında: onceki = son hamle sürer, blokla = kalkan. Geçersiz cevap / API hatası: hep onceki.
+zaman-asiminda: onceki
+max-tokens: 80
+dusunce-max-kelime: 10
+# Düşünceleri oyun sohbetine de renkli yaz (kayıtta görünür)
+dusunceleri-sohbete-yaz: true
+
+mac:
+  en-iyi: 5                     # best of 5: 3 galibiyet alan kazanır
+  sure-tick: 1800               # 90 sn
+  ani-olum-sure-tick: 600       # süre bitti + can eşitse: iki taraf 1 can, 30 sn
+  geri-sayim-tick: 60
+  ara-tick: 100                 # maçlar arası özet süresi
+  # false: can sadece altın elmayla dolar (yoksa doygunluk iyileşmesi maçı uzatır)
+  dogal-iyilesme: false
+
+arena:
+  dunya: yz_arena
+  zemin-y: 64
+  zemin-yaricap: 12             # 25x25 bedrock, etrafı bariyer
+  duvar-yukseklik: 6
+  baslangic-mesafe: 10
+
+kit:
+  # Hasar/vuruş (elmas kılıç): demir zırh ~4, kritik ~6.4 (4 kritikle biter, maç 5 sn sürebilir).
+  # Elmas zırh ~2, kritik ~3.2. Netherite Prot IV ~1, 90 sn yetmez.
+  zirh: diamond                  # leather | chainmail | iron | diamond | netherite | none
+  kilic: diamond_sword          # diamond_sword | netherite_sword
+  kalkan: true                  # false: blokla = eğilip durmak
+  altin-elma: 2
+
+# Hamleler arası bot davranışı
+# Elle kurulan arenada kenar zekasi: modellere her yonde kac guvenli blok kaldigi soylenir ve bot
+# kendi yuruyerek lava/ucuruma girmez. false = kor ve kendini atabilen eski hal (video "once" sahnesi).
+kenar-zekasi: true
+
+# Ders defteri: /yzmac antrenman N -> her maçtan sonra iki model de kendi maç kaydını okuyup derslerini
+# yeniden yazar (aynı koç promptu, aynı sınırlar). kullan: true = normal serilerde de her model kendi
+# derslerini talimatında görür. false = "eğitimsiz" hâl (önce/sonra karşılaştırması). /yzmac defter
+ders-defteri:
+  kullan: true
+  max-ders: 5
+  max-kelime: 15
+
+# /yzmac kapis (insan vs YZ) video ayari: YZ'nin insana verdigi hasar ve insanin YZ'ye verdigi hasar
+# bu carpanlarla carpilir. Kamerada gorunmez. 1.0 = adil.
+kapis:
+  rakip-hasar-carpani: 1.0
+  insan-hasar-carpani: 1.0
+
+# Dovus karti egitimi: /yzmac egitim <nesil> [mac/nesil] [hizli]. Dovuslerde API cagrisi yok; her nesil
+# sonunda model kartini yeniden yazar (1 cagri). kullan: true = egitilmis kart (varsa) seri ve kapismada
+# govdeyi yonetir. /yzmac kart sifirla = egitimsiz hale don.
+dovus-karti:
+  kullan: true
+# Iki modelin de karsisina cikan sabit antrenman kuklasi (ayni kart turu).
+egitim:
+  # Bir nesilde maclarin 2/3'unu kazanan modelin kuklasi bir seviye zorlasir (iki tarafa ayni kural).
+  kukla-zorlasir: true
+  kukla:
+    vurus_sarj: 0.95
+    kritik: 0.35
+    wtap: 2
+    strafe: 0.4
+    strafe_degistir: 14
+    geri_cekil: 0
+    kalkan: 0.3
+    iyiles_can: 7
+    menzil: 2.9
+    sprint: true
+
+yurutucu:
+  kac-mesafe: 8.0               # kac / iyiles bu mesafeye kadar uzaklaşır
+  yaklas-dur-mesafe: 3.5
+  yan-adim-degistir-tick: 12
+
+mock:
+  min-gecikme-ms: 200
+  max-gecikme-ms: 900
+  gecersiz-orani: 0.05

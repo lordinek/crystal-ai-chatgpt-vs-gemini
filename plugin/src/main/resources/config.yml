@@ -1,0 +1,200 @@
+# CrystalAI plugin config. Every tunable number lives here, not in code.
+
+npc:
+  # Player name = prefix + counter (max 16 chars total)
+  name-prefix: "CrystalAI_"
+  # Coloured prefix above the head, %04d = generation number
+  tag-prefix-format: "Gen %04d · "
+  # Difficulty when /crystalai spawn gets none: kolay | orta | pro | insanustu
+  # (not used by any behaviour until stage 8)
+  default-difficulty: orta
+  # Blocks in front of the player where the NPC appears
+  spawn-distance: 2.0
+  # Hide "X joined/left the game" for NPCs
+  silent-join-quit: true
+  # Remove a dead NPC from the server, after this many ticks (so the death animation shows)
+  remove-on-death: true
+  death-remove-delay-ticks: 20
+  # Damage immunity after spawning (vanilla players get 60 = 3 s)
+  spawn-invulnerable-ticks: 0
+  # How often (ticks) the NPC's position is pushed to the chunk loader
+  chunk-update-interval-ticks: 10
+
+  # Kit given on spawn: full = combat kit below, totem = offhand totem only, none
+  spawn-kit: totem
+  # Until arenas exist (stage 4): NPC faces and moves relative to the nearest other player
+  auto-focus: true
+  focus-range: 32.0
+
+actions:
+  # Vanilla survival client reach, measured from the eyes
+  block-reach: 4.5
+  entity-reach: 3.0
+  # Blocks/crystals must be visible, as for a real player
+  require-line-of-sight: true
+  # "Crystal" action places obsidian first when the base is not obsidian/bedrock
+  crystal-places-obsidian: true
+  # Hotbar slot an item is swapped into when it is only in the main inventory
+  fallback-hotbar-slot: 8
+  # Sword hit only when the swing is at least this charged (vanilla attack strength 0-1).
+  # A pro never spams uncharged hits; 0.9 = the last ~2 ticks of a netherite sword's 12.
+  sword-min-charge: 0.9
+  # Pearl action (schema v2): pitch of the 8 direction throws, degrees (negative = upward).
+  # -10 lands roughly 20-30 blocks away on flat ground; the boundary is 32 from the site centre.
+  pearl-pitch: -10.0
+  # /crystalai do <npc> move <dir> without a tick count
+  default-move-ticks: 20
+
+# Candidate crystal spots offered to the model each decision step
+candidates:
+  count: 8
+  # Search box around the target's feet (crystal height dy relative to the feet)
+  horizontal-radius: 4
+  min-dy: -3
+  max-dy: 1
+  # Exposure raycasts are expensive: only the best K (by full-exposure bound) get exact damage
+  exact-top-k: 24
+  # Ranking score = damage to target - weight * damage to self
+  self-damage-weight: 0.5
+  # Also offer spots where obsidian has to be placed first
+  allow-new-obsidian: true
+  # /crystalai candidates: how long the particles stay
+  show-ticks: 100
+
+# Candidate anchor spots offered to the model (schema v2 'anchor' action): empty cells around
+# the target's feet; an anchor needs no special base, so it can go right next to the opponent
+anchor-candidates:
+  count: 4
+  horizontal-radius: 2
+  min-dy: -1
+  max-dy: 1
+  exact-top-k: 8
+  self-damage-weight: 0.5
+
+# Training arenas: N pairs of NPCs fighting at the same time.
+arenas:
+  # natural = random sites in a generated overworld, like /rtp on a real cpvp server (v2)
+  # flat    = small bedrock arenas with barrier walls in a void world (v1)
+  terrain: natural
+  natural:
+    world: crystalai_dunya
+    seed: 20260926
+    # Sites are picked within this many blocks of 0,0
+    region-radius: 4000
+    # Moving farther than this from the site centre loses the episode (no walls)
+    boundary-radius: 32
+    min-site-separation: 200
+    # Chunks around a site kept loaded and generated ahead of time (3 -> 7x7 chunks)
+    load-radius-chunks: 3
+    # The spawn area must be this flat and free of water, lava, trees and huge mushrooms
+    max-slope: 3
+    clear-radius: 6
+    # A site hosts a random number of episodes in this range, craters and all, then a new one
+    # is taken (only once it has been generated in the background)
+    episodes-per-site-min: 1
+    episodes-per-site-max: 4
+    # Tries for the drawn biome before any listed biome is accepted
+    attempts-per-biome: 24
+    view-distance: 3
+    # World reset (disk): throw the world away and regenerate it with a new seed (a new map)
+    # after this many minutes or once its folder is bigger than this (0 = off). Episodes running
+    # at that moment end as aborted; the trainer waits while the new sites are generated.
+    reset-every-minutes: 90
+    reset-above-mb: 3000
+    # Closing border: boundary-radius shrinks to shrink-min-radius between these episode ticks,
+    # so waiting for the timeout stops being an option (end <= start turns it off)
+    shrink-start-ticks: 400
+    shrink-end-ticks: 2000
+    shrink-min-radius: 8
+    # Outside the current border: zone damage (armor-piercing, like the world border) instead of
+    # losing; only running further than escape-margin beyond boundary-radius loses the episode
+    zone-damage: 2.0
+    zone-damage-interval-ticks: 10
+    escape-margin: 16
+    # Biome -> weight (MCTiers-style cpvp servers: /rtp desert, snow, badlands, mushroom, plains)
+    biomes:
+      desert: 1.0
+      snowy_plains: 0.5
+      snowy_taiga: 0.5
+      badlands: 1.0
+      mushroom_fields: 0.5
+      plains: 1.0
+  # --- flat mode only ---
+  world: crystalai_arenas
+  count: 8
+  # Distance between arena centres (crystal explosions reach 12 blocks)
+  spacing: 64
+  floor-y: 64
+  # Floor is (2r+1) x (2r+1) bedrock, closed in by barrier walls and a barrier ceiling
+  floor-radius: 10
+  wall-height: 10
+  # Distance between the two NPCs at the start of an episode
+  spawn-distance: 6
+  # 2400 ticks = 2 min game time (22 totems each: 60 s was too short to ever finish)
+  episode-timeout-ticks: 2400
+  # A decision every N ticks
+  decision-interval-ticks: 1
+  difficulty: hard
+  # python = driven by the trainer over the bridge (arenas freeze until it connects),
+  # idle = stands still, random = random valid actions
+  controllers:
+    a: python
+    b: python
+  random:
+    # Chance per decision that the crystal/explode/util branches do something
+    act-probability: 0.3
+  log-episodes: true
+
+# Plugin <-> trainer connection (protocol/schema.json)
+bridge:
+  # Localhost only
+  port: 25590
+  # Max wait for the trainer's answer to one step; then it is disconnected and arenas freeze
+  timeout-ms: 120000
+
+# Standard combat kit ("material:amount[:enchant=level,...]"). Totems don't stack, extra ones
+# fill separate slots. v2 full kit (docs/tam_kit_plani.md §3, common duel kit, not yet verified
+# against a real server): netherite Prot IV (leggings Blast Prot IV), Mending + Unbreaking III.
+kit:
+  armor-material: netherite   # or none
+  armor-enchants: [protection=4, mending=1, unbreaking=3]
+  leggings-enchants: [blast_protection=4, mending=1, unbreaking=3]
+  offhand: totem_of_undying
+  hotbar:
+    - netherite_sword:1:sharpness=5,mending=1,unbreaking=3
+    - respawn_anchor:64
+    - glowstone:64
+    - experience_bottle:64
+    - obsidian:64
+    - totem_of_undying:1
+    - ender_pearl:16
+    - golden_apple:64
+    - end_crystal:64
+  inventory:
+    - obsidian:64
+    - end_crystal:64
+    - glowstone:64
+    - experience_bottle:64
+    - netherite_pickaxe:1:efficiency=5,mending=1,unbreaking=3
+    - totem_of_undying:22
+
+debug:
+  # Decision-loop timings (ms per tick per section) in the console every N ticks
+  profile: false
+  profile-every-ticks: 400
+  # Log every hit an NPC takes (final/raw damage, cause) to the console
+  log-damage: false
+  # Log every totem an NPC pops (noisy with arenas running)
+  log-totems: false
+
+# Player vs. AI duel (/crystalai duel)
+duel:
+  # 6000 ticks = 5 min
+  timeout-ticks: 6000
+  # true: the AI always takes its most likely choice; false: it samples like in training
+  greedy: false
+  # Record the human's play (observation + inferred action every tick) for imitation learning,
+  # into plugins/CrystalAI/recordings/*.jsonl
+  record: true
+  # Fighters sort their inventory first; the countdown starts once each typed /ready
+  require-ready: true
